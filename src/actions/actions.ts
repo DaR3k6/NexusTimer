@@ -1,5 +1,4 @@
 "use server";
-
 import connectDB from "@/db/mongodb";
 import Backup from "@/models/backup";
 import User, { Users } from "@/models/user";
@@ -43,8 +42,11 @@ export async function createBackup({
 }) {
   try {
     await connectDB();
+
     const user = await User.findOne({ email: email });
+
     if (!user) throw new Error("User not found");
+
     const backup = await Backup.create({
       user: user._id,
       data: data,
@@ -53,6 +55,30 @@ export async function createBackup({
     return true;
   } catch (error: any) {
     console.log(error);
+    return false;
+  }
+}
+
+export async function getBackupData({ email }: { email: string }) {
+  try {
+    await connectDB();
+
+    const user = await User.findOne({ email: email });
+    if (!user) throw new Error("User not found");
+
+    const backup = await Backup.findOne({ user: user._id })
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
+
+    if (!backup) throw new Error("Backup not found for user");
+
+    const serializedBackup = JSON.parse(JSON.stringify(backup));
+
+    return serializedBackup;
+  } catch (error: any) {
+    console.error(error);
     return false;
   }
 }

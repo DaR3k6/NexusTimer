@@ -60,6 +60,86 @@ export async function getAllCubes(): Promise<Cube[]> {
   });
 }
 
+export const updateLocalCubes = async (updatedCubes: Cube[]) => {
+  const cubeDB = new IDBStore({
+    dbVersion,
+    storeName,
+    keyPath,
+    autoIncrement,
+    onStoreReady: async () => {
+      try {
+        console.log("Base de datos lista para operaciones");
+
+        // 1. Obtener todos los cubos actuales desde IndexedDB
+        const existingCubes = await getAllFromIndexedDB(cubeDB);
+
+        // 2. Comparar y actualizar los cubos según los cambios
+        await syncCubesInIndexedDB(existingCubes, updatedCubes, cubeDB);
+
+        console.log("IndexedDB sincronizada con éxito.");
+      } catch (error) {
+        console.error("Error al actualizar la base de datos local:", error);
+      }
+    },
+    onError: (error: any) => {
+      console.error("Error al abrir la base de datos:", error);
+    },
+    indexes: indexes,
+  });
+};
+
+// Función para obtener todos los cubos desde IndexedDB
+const getAllFromIndexedDB = (cubeDB: any): Promise<Cube[]> => {
+  return new Promise((resolve, reject) => {
+    cubeDB.getAll(
+      (data: Cube[]) => {
+        console.log("Cubes obtenidos de IndexedDB:", data);
+        resolve(data);
+      },
+      (error: any) => {
+        console.error("Error al obtener cubos de IndexedDB:", error);
+        reject(error);
+      }
+    );
+  });
+};
+
+// Función para sincronizar los cubos en IndexedDB
+const syncCubesInIndexedDB = async (
+  existingCubes: Cube[],
+  updatedCubes: Cube[],
+  cubeDB: any
+) => {
+  console.log("Cubos existentes:", existingCubes);
+  console.log("Cubos actualizados:", updatedCubes);
+
+  const existingCubeMap = new Map(existingCubes.map((cube) => [cube.id, cube]));
+
+  for (const cube of updatedCubes) {
+    const existingCube = existingCubeMap.get(cube.id);
+
+    if (existingCube) {
+      // Actualizar el cubo si hay cambios
+      if (JSON.stringify(existingCube) !== JSON.stringify(cube)) {
+        console.log(`Actualizando cubo: ${cube.name}`);
+        console.log("Antes:", existingCube);
+        console.log("Después:", cube);
+        await cubeDB.put(cube);
+      }
+      existingCubeMap.delete(cube.id); // Eliminar del mapa para saber qué cubos siguen presentes
+    } else {
+      // Insertar nuevo cubo
+      console.log(`Insertando nuevo cubo: ${cube.name}`);
+      await cubeDB.put(cube);
+    }
+  }
+
+  existingCubeMap.forEach(async (cube, id) => {
+    console.log(`Eliminando cubo obsoleto: ${cube.name}`);
+    await cubeDB.remove(id);
+  });
+};
+
 export async function saveCube({
   id = genId(),
   name,
