@@ -1,6 +1,6 @@
 "use server";
 import connectDB from "@/db/mongodb";
-import Backup from "@/models/backup";
+import Backup, { Backups } from "@/models/backup";
 import User, { Users } from "@/models/user";
 
 export async function createOrUpdateUser({
@@ -37,8 +37,8 @@ export async function createBackup({
   email,
   data,
 }: {
-  email: string;
-  data: string;
+  email: Pick<Users, "email">;
+  data: Pick<Backups, "data">;
 }) {
   try {
     await connectDB();
